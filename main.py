@@ -164,7 +164,7 @@ class ActionPanel(QWidget):
         pixmap = QPixmap("icon.png").scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         icon_label.setPixmap(pixmap)
         
-        title_label = QLabel("Badgr")
+        title_label = QLabel("Templatr")
         title_font = QFont("Impact", 28, QFont.Normal)
         title_label.setFont(title_font)
         title_label.setStyleSheet("color: #4285F4; margin-bottom: 5px;")
@@ -198,6 +198,12 @@ class ActionPanel(QWidget):
         layout.addWidget(gen_group)
 
         layout.addStretch()
+
+        # Add signature at the very bottom left
+        sig_label = QLabel("made with 🤍 by bechir touskié")
+        sig_label.setStyleSheet("color: #F44336; font-style: italic; margin-top: 10px;")
+        sig_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(sig_label)
 
         # Wire signals
         self._btn_png.clicked.connect(self.load_template_clicked)
@@ -465,7 +471,7 @@ class DataPanel(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Badgr - Certificate/Badge Generator")
+        self.setWindowTitle("Templatr - Certificate/Badge Generator")
         self.setWindowIcon(QIcon("icon.png"))
         self.resize(1400, 850)
 
@@ -515,10 +521,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._progress)
         self.statusBar().showMessage("Ready")
         
-        # Add footer label
-        footer_label = QLabel("created with love by Bechir Touskié")
-        footer_label.setStyleSheet("color: #888888; font-style: italic;")
-        self.statusBar().addWidget(footer_label)
+
 
         self._connect_signals()
         self._apply_dark_theme()
@@ -889,17 +892,17 @@ import ctypes
 def main():
     try:
         # Tell Windows this is a distinct app so the taskbar uses the QIcon
-        myappid = 'pash.badgr.printgen.1'
+        myappid = 'pash.templatr.printgen.1'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     except Exception:
         pass
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Badgr Certificate Generator")
+    app.setApplicationName("Templatr Certificate Generator")
     app.setStyle("Fusion")
 
     window = MainWindow()
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec())
 
 

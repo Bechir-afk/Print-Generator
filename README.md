@@ -1,8 +1,8 @@
-# Badgr - Certificate & Badge Generator
+# Templatr - Certificate & Badge Generator
 
-![Badgr Icon](icon.png)
+![Templatr Icon](icon.png)
 
-**Badgr** is a sleek, modern desktop application built with Python and PySide6 that automates the generation and email delivery of customized certificates, badges, and print assets from CSV data.
+**Templatr** is a sleek, modern desktop application built with Python and PySide6 that automates the generation and email delivery of customized certificates, badges, and print assets from CSV data.
 
 ## Features
 
@@ -23,8 +23,8 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/Badgr.git
-   cd Badgr
+   git clone https://github.com/yourusername/Templatr.git
+   cd Templatr
    ```
 
 2. **Create and activate a virtual environment:**

@@ -46,11 +46,22 @@ class ResizeHandle(QGraphicsRectItem):
             self._origin = event.scenePos()
             box = self._parent_box
             r = box.rect()
+            old_h = r.height()
+            
             new_w = max(20, r.width() + delta.x())
             new_h = max(20, r.height() + delta.y())
+            
+            if old_h > 0:
+                scale_factor = new_h / old_h
+                new_font_size = max(1, int(box.box_def.font_size * scale_factor))
+                box.box_def.font_size = new_font_size
+                
             box.setRect(QRectF(r.x(), r.y(), new_w, new_h))
             box._sync_handle()
             box._update_label()
+            
+            box.sync_def_from_item()
+            box.box_changed.emit(box)
             event.accept()
 
     def mouseReleaseEvent(self, event):
