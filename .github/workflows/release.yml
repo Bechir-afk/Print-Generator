@@ -1,0 +1,48 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --windowed --name Templatr `
+            --icon icon.png `
+            --add-data "icon.png;." `
+            --hidden-import PySide6.QtSvg `
+            --hidden-import PySide6.QtPrintSupport `
+            main.py
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ steps.sha.outputs.short }}
+          name: "Templatr – build ${{ steps.sha.outputs.short }}"
+          body: "Automated build from commit ${{ github.sha }}"
+          files: dist/Templatr.exe
