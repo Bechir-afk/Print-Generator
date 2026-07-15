@@ -1,6 +1,6 @@
 """main.py — Entry point for the IEEE Certificate/Badge Batch Generator.
 
-Wires together: canvas ↔ project_io ↔ data_engine ↔ render_engine.
+Wires together: canvas ↔ data_engine ↔ render_engine.
 """
 
 import logging
@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QFont, QIcon, QPixmap
 
-from project_io import load_project, save_project, TextBoxDef
 from canvas import CanvasView, TextBoxItem
 from data_engine import load_csv, auto_map, validate_mapping
 from render_engine import render_batch, render_single
@@ -146,9 +145,6 @@ class ActionPanel(QWidget):
     load_csv_clicked = Signal()
     generate_clicked = Signal()
     email_clicked = Signal()
-    new_project_clicked = Signal()
-    open_project_clicked = Signal()
-    save_project_clicked = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -334,7 +330,7 @@ class PropertiesPanel(QWidget):
             self._var_combo.setCurrentText(self._current_item.box_def.variable)
         self._var_combo.blockSignals(False)
 
-    def _update_pos_size(self, d: TextBoxDef):
+    def _update_pos_size(self, d):
         self._pos_label.setText(f"({d.x:.0f}, {d.y:.0f})")
         self._size_label.setText(f"{d.width:.0f} × {d.height:.0f}")
 
@@ -475,7 +471,6 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon("icon.png"))
         self.resize(1400, 850)
 
-        self._project_path: str | None = None
         self._template_path: str = ""
         self._csv_path: str | None = None
         self._id_column: str | None = None
@@ -520,8 +515,6 @@ class MainWindow(QMainWindow):
         self._progress.setVisible(False)
         self.statusBar().addPermanentWidget(self._progress)
         self.statusBar().showMessage("Ready")
-        
-
 
         self._connect_signals()
         self._apply_dark_theme()
@@ -543,8 +536,6 @@ class MainWindow(QMainWindow):
         p.setColor(QPalette.Highlight, QColor(66, 133, 244))
         p.setColor(QPalette.HighlightedText, QColor(255, 255, 255))
         QApplication.instance().setPalette(p)
-
-
 
     def _connect_signals(self):
         # Canvas signals

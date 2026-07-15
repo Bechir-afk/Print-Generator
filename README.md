@@ -35,7 +35,6 @@ Designed specifically for IEEE branch events, workshops, and competitions, but f
 | 📐 **Smart Alignment Guides** | Snap text to canvas center or align relative to other elements |
 | ⚡ **Batch Generation** | Render hundreds of personalized PNGs in seconds using Pillow |
 | 📧 **Batch Email Delivery** | Send certificates directly to participants via built-in SMTP — generated in-memory, zero local storage required |
-| 💾 **Project Save / Load** | Save your full design as a `.json` project file and reload it anytime |
 | 🌙 **Dark Mode UI** | Clean, modern dark mode using Qt Fusion palette with blue accents |
 
 ---
@@ -99,7 +98,7 @@ The **Preview Panel** renders the actual Pillow output — a pixel-accurate repr
 
 ### Step 1 — Load Your Template
 
-Click the **"📂 Load Template (PNG)"** button in the right panel. Select the PNG image you want to use as the base for your certificates or badges. The image will appear on the central design canvas.
+Click the **"📄 Load Template (PNG)"** button in the right panel. Select the PNG image you want to use as the base for your certificates or badges. The image will appear on the central design canvas.
 
 > **Tip:** Use a high-resolution PNG (at least 1200×800px) for best print quality output.
 
@@ -169,22 +168,16 @@ Each certificate is generated in-memory and attached directly to the outgoing em
 
 ---
 
-### Step 7 — Save Your Project
-
-Click **"💾 Save Project"** to export your full canvas design (template path + all text box definitions) as a `.json` file. Reload it later with **"📂 Load Project"** to pick up exactly where you left off.
-
----
-
 ## 🏗️ Architecture Overview
 
-The application is structured around four independent engines:
+The application is structured around three independent engines:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   1. DESIGN CANVAS (UI)                     │
 │  QGraphicsView/QGraphicsScene — drag-and-drop text boxes    │
 └──────────────────────────┬──────────────────────────────────┘
-                           │ project.json
+                           │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   2. DATA ENGINE                            │
@@ -214,7 +207,6 @@ The application is structured around four independent engines:
 | UI Framework | PySide6 (~6.10) | Official Qt-for-Python, LGPL licensed |
 | Image Rendering | Pillow 12.3.0 | `ImageDraw` + `ImageFont.truetype()` |
 | Data Parsing | `csv` (stdlib) | Zero-dependency, no pandas overhead |
-| Project Persistence | `json` (stdlib) | Flat JSON project files |
 | Email Delivery | `smtplib` (stdlib) | In-memory attachment, no temp files |
 | Packaging | PyInstaller (~6.21) | Standalone Windows `.exe` output |
 
