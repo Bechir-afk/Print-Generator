@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QSplitter, QPushButton, QLabel, QLineEdit, QComboBox, QSpinBox,
     QColorDialog, QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
     QFormLayout, QGroupBox, QMessageBox, QMenu, QGraphicsView, QProgressBar,
-    QDialog, QDialogButtonBox, QTextEdit, QFontComboBox
+    QDialog, QDialogButtonBox, QTextEdit, QFontComboBox, QButtonGroup
 )
 from PySide6.QtGui import QFont, QIcon, QPixmap
 
@@ -194,7 +194,7 @@ class ActionPanel(QWidget):
         self._btn_generate = self._make_btn(
             "\U0001F680  Batch Generate", "#C62828", gen_lay, 52)
         self._btn_email = self._make_btn(
-            "\U0001F4E7  Send Emails", "#4A148C", gen_lay, 42)
+            "\U0001F4E7  Generate & Send", "#4A148C", gen_lay, 42)
         layout.addWidget(gen_group)
 
         layout.addStretch()
@@ -765,6 +765,9 @@ class MainWindow(QMainWindow):
         self._worker.progress.connect(self._on_render_progress)
         self._worker.finished_ok.connect(self._on_render_done)
         self._worker.finished_err.connect(self._on_render_error)
+        # Clear the reference only after the thread has fully terminated,
+        # not from the result slots (which run while run() is still executing).
+        self._worker.finished.connect(self._clear_worker)
         self._worker.start()
 
     def _email_batch(self):
@@ -787,26 +790,80 @@ class MainWindow(QMainWindow):
                 
         # EmailDialog class nested for simplicity
         class EmailDialog(QDialog):
+            # Default SMTP configs per provider. Both use STARTTLS on 587.
+            PROVIDERS = {
+                "Gmail": {
+                    "server": "smtp.gmail.com",
+                    "port": 587,
+                    "color": "#EA4335",  # Gmail red
+                    "emoji": "\U0001F4EE",  # postbox
+                    "placeholder": "your.email@gmail.com",
+                    "app_password_url": "https://myaccount.google.com/apppasswords",
+                    "notice": (
+                        "⚠️  For Gmail, use an <b>App Password</b>, not your normal "
+                        "account password. It requires 2-Step Verification to be enabled."
+                    ),
+                },
+                "Outlook": {
+                    "server": "smtp-mail.outlook.com",
+                    "port": 587,
+                    "color": "#0078D4",  # Microsoft blue
+                    "emoji": "\U0001F4E7",  # envelope
+                    "placeholder": "your.email@outlook.com",
+                    "app_password_url": "https://account.live.com/proofs/AppPassword",
+                    "notice": (
+                        "⚠️  For Outlook, use an <b>App Password</b> if 2-Step "
+                        "Verification is on. Note: Microsoft is phasing out basic "
+                        "SMTP auth, so some accounts may be rejected."
+                    ),
+                },
+            }
+
             def __init__(self, headers, parent=None):
                 super().__init__(parent)
                 self.setWindowTitle("Configure Batch Email")
-                self.resize(400, 400)
+                self.resize(400, 420)
+                self._provider = None  # selected provider key; SMTP config kept internally
                 layout = QVBoxLayout(self)
 
+                # ── Provider selection: two brand-colored buttons on one row ──
+                layout.addWidget(QLabel("Email provider:"))
+                prov_row = QHBoxLayout()
+                self.provider_group = QButtonGroup(self)
+                self.provider_group.setExclusive(True)
+                self._prov_buttons = {}
+                for name in self.PROVIDERS:
+                    btn = QPushButton(f"{self.PROVIDERS[name]['emoji']}  {name}")
+                    btn.setCheckable(True)
+                    btn.setMinimumHeight(44)
+                    btn.setCursor(Qt.PointingHandCursor)
+                    btn.setStyleSheet(self._provider_button_style(name))
+                    self.provider_group.addButton(btn)
+                    self._prov_buttons[name] = btn
+                    btn.clicked.connect(lambda _=False, n=name: self._apply_provider(n))
+                    prov_row.addWidget(btn)
+                layout.addLayout(prov_row)
+
+                # Provider notice (updated when the provider changes).
+                self.notice = QLabel()
+                self.notice.setWordWrap(True)
+                self.notice.setStyleSheet(
+                    "background: #3a2f00; color: #ffd54f; border: 1px solid #6d5a00; "
+                    "border-radius: 4px; padding: 6px 8px; font-size: 11px;"
+                )
+                layout.addWidget(self.notice)
+
                 form = QFormLayout()
-                self.smtp_server = QLineEdit("smtp.gmail.com")
-                form.addRow("SMTP Server:", self.smtp_server)
-                self.smtp_port = QSpinBox()
-                self.smtp_port.setRange(1, 65535)
-                self.smtp_port.setValue(587)
-                form.addRow("SMTP Port:", self.smtp_port)
                 self.sender = QLineEdit()
-                self.sender.setPlaceholderText("your.email@gmail.com")
                 form.addRow("Sender Email:", self.sender)
                 self.password = QLineEdit()
                 self.password.setEchoMode(QLineEdit.Password)
                 self.password.setPlaceholderText("App Password")
                 form.addRow("Password:", self.password)
+                self.pw_link = QLabel()
+                self.pw_link.setOpenExternalLinks(True)
+                self.pw_link.setStyleSheet("font-size: 11px;")
+                form.addRow("", self.pw_link)
                 self.receiver = QComboBox()
                 self.receiver.addItems(headers)
                 form.addRow("Receiver Column:", self.receiver)
@@ -814,16 +871,43 @@ class MainWindow(QMainWindow):
                 form.addRow("Subject:", self.subject)
                 self.body = QTextEdit("Attached is your certificate.")
                 form.addRow("Body:", self.body)
-                
+
                 layout.addLayout(form)
-                bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-                bbox.accepted.connect(self.accept)
-                bbox.rejected.connect(self.reject)
-                layout.addWidget(bbox)
+                self.bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+                self.bbox.button(QDialogButtonBox.Ok).setText("Generate && Send")
+                self.bbox.accepted.connect(self.accept)
+                self.bbox.rejected.connect(self.reject)
+                layout.addWidget(self.bbox)
+
+                # Default to the first provider selected.
+                first = next(iter(self.PROVIDERS))
+                self._prov_buttons[first].setChecked(True)
+                self._apply_provider(first)
+
+            @staticmethod
+            def _provider_button_style(name: str) -> str:
+                base = EmailDialog.PROVIDERS[name]["color"]
+                return (
+                    f"QPushButton {{ background: #2b2b2b; color: #ddd; border: 2px solid #444; "
+                    f"border-radius: 6px; font-size: 14px; font-weight: bold; padding: 6px; }}"
+                    f"QPushButton:hover {{ border-color: {base}; }}"
+                    f"QPushButton:checked {{ background: {base}; color: white; "
+                    f"border-color: {base}; }}"
+                )
+
+            def _apply_provider(self, name: str):
+                self._provider = name
+                cfg = self.PROVIDERS[name]
+                self.sender.setPlaceholderText(cfg["placeholder"])
+                self.notice.setText(cfg["notice"])
+                self.pw_link.setText(
+                    f'<a href="{cfg["app_password_url"]}">Get a {name} App Password →</a>'
+                )
 
             def get_data(self):
+                cfg = self.PROVIDERS[self._provider]
                 return {
-                    "smtp_server": self.smtp_server.text(), "smtp_port": self.smtp_port.value(),
+                    "smtp_server": cfg["server"], "smtp_port": cfg["port"],
                     "sender": self.sender.text(), "password": self.password.text(),
                     "receiver_column": self.receiver.currentText(), "subject": self.subject.text(),
                     "body": self.body.toPlainText()
@@ -849,12 +933,22 @@ class MainWindow(QMainWindow):
         self._worker.progress.connect(self._on_render_progress)
         self._worker.finished_ok.connect(self._on_email_done)
         self._worker.finished_err.connect(self._on_render_error)
+        self._worker.finished.connect(self._clear_worker)
         self._worker.start()
+
+    def _clear_worker(self):
+        """Drop the worker reference after its thread has fully terminated."""
+        self._worker = None
+
+    def closeEvent(self, event):
+        """Wait for any running worker thread before the window is destroyed."""
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.wait()
+        super().closeEvent(event)
 
     @Slot(int)
     def _on_email_done(self, count: int):
         self._progress.setVisible(False)
-        self._worker = None
         self.statusBar().showMessage(f"Done! {count} emails sent successfully.")
         log.info("Batch email complete: %d sent", count)
         QMessageBox.information(self, "Success", f"Successfully sent {count} emails.")
@@ -867,7 +961,6 @@ class MainWindow(QMainWindow):
     @Slot(list)
     def _on_render_done(self, outputs: list):
         self._progress.setVisible(False)
-        self._worker = None
         self.statusBar().showMessage(f"Done! {len(outputs)} certificates generated.")
         log.info("Batch render complete: %d certificates", len(outputs))
         QMessageBox.information(
@@ -879,7 +972,6 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_render_error(self, error: str):
         self._progress.setVisible(False)
-        self._worker = None
         self.statusBar().showMessage("Render failed.")
         log.error("Batch render failed: %s", error)
         QMessageBox.critical(self, "Render Error", f"Batch render failed:\n{error}")
